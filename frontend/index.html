@@ -551,14 +551,56 @@
     return String(s).replace(HTML_UNSAFE, (c) => HTML_ESCAPES[c.charCodeAt(0)]);
   }
 
-  // Разбор JSON-конверта репетитора: {type,text,payload,difficulty}
+  // Балансированно извлекает JSON-объекты верхнего уровня из текста модели.
+  // Жадный разбор от первой `{` до последней `}` ломается, когда модель шлёт
+  // НЕСКОЛЬКО конвертов подряд (после вызова инструмента) — тогда в чат
+  // протекал сырой JSON.
+  function extractJsonObjects(raw) {
+    const text = (raw || "").replace(/```(?:json)?/gi, "").replace(/```/g, "");
+    const out = [];
+    let i = 0;
+    while (i < text.length) {
+      if (text[i] !== "{") { i++; continue; }
+      let depth = 0, inStr = false, esc = false, end = -1;
+      for (let j = i; j < text.length; j++) {
+        const ch = text[j];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (ch === "\\") esc = true;
+          else if (ch === '"') inStr = false;
+        } else if (ch === '"') inStr = true;
+        else if (ch === "{") depth++;
+        else if (ch === "}") { depth--; if (depth === 0) { end = j; break; } }
+      }
+      if (end === -1) break; // незакрытый объект — частичный чанк
+      try {
+        const obj = JSON.parse(text.slice(i, end + 1));
+        if (obj && typeof obj === "object") out.push(obj);
+      } catch { /* пропускаем невалидный фрагмент */ }
+      i = end + 1;
+    }
+    return out;
+  }
+
+  // Разбор JSON-конверта репетитора: {type,text,payload,difficulty}.
+  // Сводит несколько конвертов в один — как _merge_envelopes на бэкенде.
   function parseEnvelope(raw) {
-    const t = (raw || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const start = t.indexOf("{");
-    const end = t.lastIndexOf("}");
-    if (start === -1 || end === -1 || end < start) return null;
-    try { return JSON.parse(t.slice(start, end + 1)); }
-    catch { return null; }
+    const envs = extractJsonObjects(raw).filter((e) => typeof e.text === "string");
+    if (!envs.length) return null;
+    if (envs.length === 1) return envs[0];
+    const quiz = envs.find(
+      (e) => e.type === "quiz" && e.payload && Object.keys(e.payload).length
+    );
+    const last = envs[envs.length - 1];
+    const texts = envs
+      .filter((e) => e !== quiz && e.text.trim())
+      .map((e) => e.text.trim());
+    return {
+      type: quiz ? "quiz" : (last.type || "theory"),
+      text: (texts.length ? texts : envs.map((e) => e.text.trim())).join("\n\n"),
+      payload: quiz ? quiz.payload : (last.payload || {}),
+      difficulty: (quiz || last).difficulty || "medium",
+    };
   }
 
   function renderTutor(raw) {

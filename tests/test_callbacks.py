@@ -122,6 +122,59 @@ def test_partial_plain_text_is_untouched() -> None:
     assert render_envelope_after_model(ctx, _response("Привет", partial=True)) is None
 
 
+def test_two_envelopes_in_one_response_are_merged() -> None:
+    ctx = _FakeContext()
+    # Регрессия: после вызова инструмента (generate_summary) модель шлёт два
+    # конверта подряд — прежний жадный `\\{.*\\}` давал невалидный JSON, и
+    # сырой JSON протекал в чат.
+    theory = _envelope_text(type="theory", text="Разбор темы.")
+    quiz = _envelope_text(
+        type="quiz",
+        text="Проверим понимание.",
+        payload={"question": "2+2?", "options": ["3", "4", "5", "6"]},
+    )
+    result = render_envelope_after_model(ctx, _response(theory + "\n" + quiz))
+
+    assert result is not None
+    # Текст — человекочитаемый (конкатенация), без фигурных скобок.
+    text = result.content.parts[0].text
+    assert "{" not in text
+    assert "Разбор темы." in text
+
+    stored = ctx.state[ENVELOPE_STATE_KEY]
+    assert stored["type"] == "quiz"
+    assert stored["payload"]["options"] == ["3", "4", "5", "6"]
+
+
+def test_streaming_json_hidden_until_final_by_flag() -> None:
+    ctx = _FakeContext()
+    # Первый чанк конверта — взводит флаг и прячется.
+    first = render_envelope_after_model(
+        ctx, _response('{"type": "theory", "te', partial=True)
+    )
+    assert first is not None and first.content.parts == []
+    # Следующий чанк уже не начинается с `{`, но флаг держится — тоже прячем.
+    second = render_envelope_after_model(ctx, _response('xt": "Прив', partial=True))
+    assert second is not None and second.content.parts == []
+
+
+def test_envelope_text_with_braces_parsed() -> None:
+    ctx = _FakeContext()
+    raw = json.dumps(
+        {
+            "type": "theory",
+            "text": "Функция задаётся как y = {0} при x > 0.",
+            "payload": {},
+            "difficulty": "medium",
+        },
+        ensure_ascii=False,
+    )
+    result = render_envelope_after_model(ctx, _response(raw))
+
+    assert result is not None
+    assert result.content.parts[0].text == "Функция задаётся как y = {0} при x > 0."
+
+
 def test_empty_response_returns_none() -> None:
     ctx = _FakeContext()
     assert render_envelope_after_model(ctx, LlmResponse()) is None
