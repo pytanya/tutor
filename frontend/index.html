@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Репетитор · тетрадь ученика</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Палитра: тетрадь + классная доска + красная ручка */
+    --paper:   #fbfaf3;
+    --paper-2: #f3f1e6;
+    --grid:    #dbe4f1;
+    --ink:     #1e2a44;
+    --ink-soft:#5a6480;
+    --board:   #16352b;
+    --board-2: #1d4538;
+    --chalk:   #eef4ec;
+    --redpen:  #cf4238;
+    --marker:  #f2c14e;
+
+    --display: "Bitter", Georgia, "Times New Roman", serif;
+    --body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+    --radius: 14px;
+    --shadow: 0 6px 22px rgba(30, 42, 68, .10);
+    --gap: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: var(--body);
+    color: var(--ink);
+    /* Фон — лист тетради в клетку */
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 22px 22px, 22px 22px;
+    background-position: -1px -1px, -1px -1px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Шапка: классная доска ─────────────────────────────── */
+  .board {
+    background:
+      radial-gradient(120% 160% at 12% -40%, rgba(255,255,255,.10), transparent 55%),
+      linear-gradient(180deg, var(--board-2), var(--board));
+    color: var(--chalk);
+    border-bottom: 3px solid #0e2a21;
+    padding: 14px clamp(14px, 3vw, 28px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .brand h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(20px, 3.4vw, 27px);
+    margin: 0;
+    letter-spacing: .2px;
+    /* «меловой» вид */
+    text-shadow: 0 0 6px rgba(238,244,236,.28), 0 1px 0 rgba(0,0,0,.35);
+  }
+  .brand .sub {
+    font-size: 12.5px;
+    color: rgba(238,244,236,.7);
+    font-family: var(--mono);
+    letter-spacing: .3px;
+  }
+
+  .spacer { flex: 1 1 auto; }
+
+  .status {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 12px;
+    padding: 5px 11px; border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(238,244,236,.18);
+    white-space: nowrap;
+  }
+  .status .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--marker);
+    box-shadow: 0 0 0 0 rgba(242,193,78,.6);
+  }
+  .status[data-state="ready"] .dot { background: #7fe0a6; }
+  .status[data-state="busy"]  .dot { background: var(--marker); animation: pulse 1.1s ease-in-out infinite; }
+  .status[data-state="error"] .dot { background: #ff8b7e; }
+  @keyframes pulse {
+    50% { box-shadow: 0 0 0 6px rgba(242,193,78,0); }
+    0%  { box-shadow: 0 0 0 0 rgba(242,193,78,.6); }
+  }
+
+  .board-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  button, .btn {
+    font-family: var(--body);
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    padding: 8px 13px;
+    transition: background .15s ease, border-color .15s ease, transform .06s ease, color .15s ease;
+    background: rgba(255,255,255,.10);
+    color: var(--chalk);
+    border-color: rgba(238,244,236,.22);
+  }
+  button:hover { background: rgba(255,255,255,.18); }
+  button:active { transform: translateY(1px); }
+  button[aria-pressed="true"] {
+    background: var(--marker);
+    color: #3a2c05;
+    border-color: #d9a93b;
+  }
+
+  /* ── Основная область ──────────────────────────────────── */
+  main {
+    flex: 1 1 auto;
+    width: min(920px, 100%);
+    margin: 0 auto;
+    padding: clamp(14px, 3vw, 26px) clamp(12px, 3vw, 22px) 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .thread {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    padding-bottom: 8px;
+    scroll-behavior: smooth;
+  }
+
+  .turn { display: flex; flex-direction: column; gap: 6px; max-width: 100%; }
+  .who {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* Ответ репетитора — «запись на доске» */
+  .turn.tutor .bubble {
+    position: relative;
+    background: linear-gradient(180deg, var(--board-2), var(--board));
+    color: var(--chalk);
+    border-radius: var(--radius);
+    padding: 15px 17px 15px 21px;
+    box-shadow: var(--shadow);
+    border: 1px solid #0e2a21;
+    overflow: hidden;
+  }
+  .turn.tutor .bubble::before {
+    /* меловая полоса слева */
+    content: "";
+    position: absolute; inset: 0 auto 0 0; width: 5px;
+    background: linear-gradient(180deg, rgba(238,244,236,.75), rgba(238,244,236,.15));
+  }
+  .turn.tutor .bubble::after {
+    /* лёгкая «меловая пыль» */
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 40% at 88% 8%, rgba(255,255,255,.06), transparent 60%),
+      radial-gradient(40% 30% at 15% 95%, rgba(255,255,255,.05), transparent 60%);
+  }
+  .turn.tutor .bubble .body {
+    font-family: var(--mono);
+    font-size: 14.5px;
+    line-height: 1.62;
+    white-space: pre-wrap;
+    word-break: break-word;
+    position: relative;
+    z-index: 1;
+  }
+  .turn.tutor .bubble .body:empty::after {
+    content: "…";
+    opacity: .5;
+  }
+
+  /* Реплика ученика — «маркером» */
+  .turn.student { align-items: flex-end; }
+  .turn.student .bubble {
+    background: linear-gradient(180deg, #fff6d9, #fbeeb8);
+    border: 1px solid #e4c463;
+    border-radius: var(--radius);
+    padding: 11px 14px;
+    max-width: min(640px, 88%);
+    box-shadow: 0 3px 12px rgba(30,42,68,.08);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  /* Квиз — «красной ручкой» */
+  .quiz {
+    margin-top: 12px;
+    border-top: 2px dashed rgba(238,244,236,.35);
+    padding-top: 12px;
+    position: relative; z-index: 1;
+  }
+  .quiz .q {
+    font-family: var(--body);
+    font-weight: 600;
+    font-size: 15.5px;
+    margin: 0 0 10px;
+    color: #fff;
+  }
+  .quiz .opts { display: flex; flex-direction: column; gap: 8px; }
+  .quiz .opt {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    background: rgba(255,255,255,.06);
+    color: var(--chalk);
+    border: 1px solid rgba(238,244,236,.28);
+    border-radius: 9px;
+    padding: 9px 12px;
+  }
+  .quiz .opt:hover { background: rgba(207,66,56,.28); border-color: var(--redpen); }
+  .quiz .opt.chosen { background: var(--redpen); border-color: #a72f27; color: #fff; }
+  .quiz .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .5px;
+    color: #ffd7d2;
+    border: 1px solid rgba(207,66,56,.7);
+    border-radius: 999px; padding: 2px 9px; margin-bottom: 9px;
+  }
+
+  /* Индикатор набора */
+  .typing { display: inline-flex; gap: 5px; align-items: center; }
+  .typing i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--chalk); opacity: .4;
+    animation: blink 1.2s infinite;
+  }
+  .typing i:nth-child(2) { animation-delay: .2s; }
+  .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,60%,100%{opacity:.25} 30%{opacity:.9} }
+
+  .hint {
+    color: var(--ink-soft);
+    font-size: 14px;
+    background: rgba(255,255,255,.7);
+    border: 1px dashed #b9c4d8;
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    line-height: 1.6;
+  }
+  .hint code {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--paper-2); padding: 1px 6px; border-radius: 6px;
+  }
+
+  /* ── Панель ввода ──────────────────────────────────────── */
+  .composer {
+    position: sticky;
+    bottom: 0;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(251,250,243,0), var(--paper) 42%);
+  }
+  .composer-inner {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #cbd5e6;
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: var(--shadow);
+  }
+  .composer textarea {
+    flex: 1 1 auto;
+    resize: none;
+    border: 0;
+    outline: none;
+    font-family: var(--body);
+    font-size: 15.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: transparent;
+    padding: 8px 6px;
+    max-height: 168px;
+  }
+  .composer textarea::placeholder { color: #9aa5bd; }
+
+  .icon-btn {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    border-radius: 12px;
+    padding: 0;
+    font-size: 19px;
+    background: var(--paper-2);
+    color: var(--ink);
+    border: 1px solid #cbd5e6;
+  }
+  .icon-btn:hover { background: #e9e6d8; }
+
+  .mic[aria-pressed="true"] {
+    background: var(--marker);
+    border-color: #d9a93b;
+    color: #3a2c05;
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .send {
+    background: var(--board);
+    color: var(--chalk);
+    border-color: #0e2a21;
+    width: 44px; height: 44px;
+  }
+  .send:hover { background: var(--board-2); }
+  .send[disabled] { opacity: .45; cursor: not-allowed; }
+
+  .under {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--ink-soft);
+    font-family: var(--mono);
+    padding: 8px 4px 0;
+    flex-wrap: wrap;
+  }
+  .under .spacer { flex: 1 1 auto; }
+  kbd {
+    font-family: var(--mono); font-size: 11px;
+    background: #fff; border: 1px solid #c3cddd; border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px;
+  }
+
+  /* ── Настройки ─────────────────────────────────────────── */
+  dialog#settings {
+    width: min(520px, 94vw);
+    border: 1px solid #b9c4d8;
+    border-radius: 16px;
+    padding: 0;
+    background: var(--paper);
+    box-shadow: 0 18px 50px rgba(30,42,68,.28);
+  }
+  dialog#settings::backdrop { background: rgba(22,53,43,.5); }
+  dialog#settings header {
+    background: linear-gradient(180deg, var(--board-2), var(--board));
+    color: var(--chalk);
+    padding: 14px 18px;
+    font-family: var(--display); font-weight: 700; font-size: 18px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  dialog#settings .fields {
+    padding: 16px 18px 6px;
+    display: grid; gap: 12px;
+  }
+  dialog#settings label { display: grid; gap: 5px; font-size: 13px; color: var(--ink-soft); }
+  dialog#settings input {
+    font-family: var(--mono); font-size: 13px;
+    padding: 9px 11px;
+    border: 1px solid #c3cddd; border-radius: 9px;
+    background: #fff; color: var(--ink);
+  }
+  dialog#settings footer { padding: 12px 18px 18px; display: flex; gap: 8px; justify-content: flex-end; }
+  dialog#settings footer button.primary { background: var(--board); color: var(--chalk); border-color: #0e2a21; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  :focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }
+
+  @media (max-width: 560px) {
+    .brand .sub { display: none; }
+    .turn.student .bubble { max-width: 94%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="board">
+  <div class="brand">
+    <h1>Репетитор</h1>
+    <span class="sub">тетрадь ученика</span>
+  </div>
+  <span class="spacer"></span>
+  <span class="status" id="status" data-state="busy"><span class="dot"></span><span id="status-text">подключаюсь…</span></span>
+  <div class="board-actions">
+    <button id="tts-toggle" aria-pressed="false" title="Озвучивать ответы">🔊 Озвучка</button>
+    <button id="new-session" title="Начать новый урок">Новый урок</button>
+    <button id="open-settings" title="Настройки подключения">Настройки</button>
+  </div>
+</header>
+
+<main>
+  <div class="thread" id="thread" aria-live="polite" aria-label="Диалог с репетитором">
+    <div class="hint" id="hint">
+      <strong>Здравствуйте!</strong> Я помогу разобраться с темой.<br />
+      Напишите вопрос или нажмите и удерживайте <kbd>микрофон</kbd>, чтобы продиктовать.
+      Файл с условием задачи можно приложить кнопкой <code>📎</code>.
+    </div>
+  </div>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <div class="composer-inner">
+      <button type="button" class="icon-btn" id="attach" title="Приложить файл" aria-label="Приложить файл">📎</button>
+      <input type="file" id="file" class="sr-only" accept=".txt,.md,.csv,.json,.yaml,.yml,.xml,text/*" />
+      <label class="sr-only" for="input">Сообщение репетитору</label>
+      <textarea id="input" rows="1" placeholder="Ваш вопрос…"></textarea>
+      <button type="button" class="icon-btn mic" id="mic" aria-pressed="false" title="Удерживайте, чтобы говорить" aria-label="Голосовой ввод">🎙️</button>
+      <button type="submit" class="icon-btn send" id="send" title="Отправить" aria-label="Отправить">➤</button>
+    </div>
+    <div class="under">
+      <span id="voice-state">Голосовой ввод: выкл</span>
+      <span class="spacer"></span>
+      <span>Enter — отправить · Shift+Enter — новая строка</span>
+    </div>
+  </form>
+</main>
+
+<dialog id="settings" aria-labelledby="settings-title">
+  <header>
+    <span id="settings-title">Настройки подключения</span>
+    <button id="close-settings" aria-label="Закрыть" style="background:transparent;border-color:rgba(238,244,236,.3)">✕</button>
+  </header>
+  <div class="fields">
+    <label>Адрес ADK-сервера (api base)
+      <input id="cfg-base" placeholder="пусто = тот же origin" />
+    </label>
+    <label>Имя приложения (app name)
+      <input id="cfg-app" />
+    </label>
+    <label>Идентификатор ученика (user id)
+      <input id="cfg-user" />
+    </label>
+    <label>Язык распознавания и озвучки
+      <input id="cfg-lang" />
+    </label>
+  </div>
+  <footer>
+    <button id="reset-settings">Сбросить</button>
+    <button class="primary" id="save-settings">Сохранить</button>
+  </footer>
+</dialog>
+
+<script>
+(() => {
+  "use strict";
+
+  // Ключ, под которым сервер (tutor_agent/callbacks.py) отдаёт структурный
+  // конверт в actions.stateDelta SSE-события. Должен совпадать с бэкендом.
+  const ENVELOPE_STATE_KEY = "temp:tutor_envelope";
+
+  // ── Конфигурация ──────────────────────────────────────────
+  const DEFAULTS = {
+    base: "",                       // пусто = тот же origin (когда UI смонтирован рядом с API)
+    app:  "tutor_agent",
+    user: "student-" + Math.random().toString(36).slice(2, 8),
+    lang: "ru-RU",
+  };
+  const LS_KEY = "tutor.settings.v1";
+  const cfg = Object.assign({}, DEFAULTS, loadSettings());
+
+  let sessionId = localStorage.getItem("tutor.sessionId") || null;
+  let busy = false;
+  let ttsOn = localStorage.getItem("tutor.tts") === "1";
+
+  // ── DOM ───────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const thread = $("thread");
+  const form = $("composer");
+  const input = $("input");
+  const sendBtn = $("send");
+  const micBtn = $("mic");
+  const fileInput = $("file");
+  const statusEl = $("status");
+  const statusText = $("status-text");
+  const voiceState = $("voice-state");
+  const ttsToggle = $("tts-toggle");
+
+  // ── Настройки ─────────────────────────────────────────────
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
+    catch { return {}; }
+  }
+  function apiBase() {
+    const b = (cfg.base || "").replace(/\/+$/, "");
+    return b;
+  }
+  function url(path) { return apiBase() + path; }
+
+  function setStatus(state, text) {
+    statusEl.dataset.state = state;
+    statusText.textContent = text;
+  }
+
+  // ── Сессия ────────────────────────────────────────────────
+  async function ensureSession(forceNew = false) {
+    if (sessionId && !forceNew) return sessionId;
+    setStatus("busy", "создаю урок…");
+    const res = await fetch(
+      url(`/apps/${encodeURIComponent(cfg.app)}/users/${encodeURIComponent(cfg.user)}/sessions`),
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+    );
+    if (!res.ok) throw new Error(`Не удалось создать сессию (${res.status})`);
+    const data = await res.json();
+    sessionId = data.id;
+    localStorage.setItem("tutor.sessionId", sessionId);
+    setStatus("ready", "урок готов");
+    return sessionId;
+  }
+
+  // ── Отрисовка диалога ─────────────────────────────────────
+  function addTurn(role, html, { mono = false } = {}) {
+    const wrap = document.createElement("div");
+    wrap.className = "turn " + role;
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = role === "tutor" ? "Репетитор · мел" : "Ученик";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    const body = document.createElement("div");
+    body.className = "body";
+    if (mono) body.style.fontFamily = "var(--mono)";
+    body.innerHTML = html;
+    bubble.appendChild(body);
+    wrap.appendChild(who);
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+    return body;
+  }
+
+  const HTML_ESCAPES = { 38: "\u0026amp;", 60: "\u0026lt;", 62: "\u0026gt;", 34: "\u0026quot;", 39: "\u0026#39;" };
+  const HTML_UNSAFE = /[\u0026\u003c\u003e\u0022\u0027]/g;
+  function escapeHtml(s) {
+    return String(s).replace(HTML_UNSAFE, (c) => HTML_ESCAPES[c.charCodeAt(0)]);
+  }
+
+  // Разбор JSON-конверта репетитора: {type,text,payload,difficulty}
+  function parseEnvelope(raw) {
+    const t = (raw || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const start = t.indexOf("{");
+    const end = t.lastIndexOf("}");
+    if (start === -1 || end === -1 || end < start) return null;
+    try { return JSON.parse(t.slice(start, end + 1)); }
+    catch { return null; }
+  }
+
+  function renderTutor(raw) {
+    const env = parseEnvelope(raw);
+    const text = env && typeof env.text === "string" ? env.text : raw;
+    const container = addTurn("tutor", "");
+    container.textContent = text || raw;
+
+    if (env && env.type === "quiz" && env.payload) {
+      renderQuiz(container, env.payload);
+    }
+    speak(text || raw);
+    return text || raw;
+  }
+
+  function renderQuiz(container, payload) {
+    const box = document.createElement("div");
+    box.className = "quiz";
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = "Проверочный вопрос";
+    const q = document.createElement("p");
+    q.className = "q";
+    q.textContent = payload.question || "Вопрос";
+    box.appendChild(badge);
+    box.appendChild(q);
+
+    const opts = document.createElement("div");
+    opts.className = "opts";
+    const options = Array.isArray(payload.options) ? payload.options : [];
+    options.forEach((opt) => {
+      const b = document.createElement("button");
+      b.className = "opt";
+      b.type = "button";
+      b.textContent = opt;
+      b.addEventListener("click", () => {
+        if (box.dataset.answered) return;
+        box.dataset.answered = "1";
+        [...opts.children].forEach((c) => c.disabled = true);
+        b.classList.add("chosen");
+        sendMessage(`Мой ответ: ${opt}`);
+      });
+      opts.appendChild(b);
+    });
+    box.appendChild(opts);
+    container.appendChild(box);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  // ── Отправка и стриминг SSE ───────────────────────────────
+  async function sendMessage(text) {
+    text = (text || "").trim();
+    if (!text || busy) return;
+    busy = true;
+    sendBtn.disabled = true;
+    addTurn("student", escapeHtml(text));
+    input.value = "";
+    autosize();
+
+    const body = addTurn("tutor", '<span class="typing"><i></i><i></i><i></i></span>');
+    let acc = "";
+    let first = true;
+    // Структурный конверт репетитора приходит отдельным каналом —
+    // в actions.stateDelta[ENVELOPE_STATE_KEY] (см. tutor_agent/callbacks.py).
+    let envelope = null;
+
+    try {
+      const sid = await ensureSession();
+      setStatus("busy", "репетитор думает…");
+
+      const res = await fetch(url("/run_sse"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          app_name: cfg.app,
+          user_id: cfg.user,
+          session_id: sid,
+          streaming: true,
+          new_message: { role: "user", parts: [{ text }] },
+        }),
+      });
+      if (!res.ok || !res.body) {
+        throw new Error(`Сервер ответил ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          const block = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const dataLines = block.split("\n").filter((l) => l.startsWith("data:"));
+          for (const line of dataLines) {
+            const payloadStr = line.slice(5).trim();
+            if (!payloadStr) continue;
+            let ev;
+            try { ev = JSON.parse(payloadStr); } catch { continue; }
+            if (ev.error) throw new Error(typeof ev.error === "string" ? ev.error : "ошибка агента");
+            // Отдельный канал: структурный конверт из after_model_callback.
+            const delta = ev.actions && ev.actions.stateDelta;
+            if (delta && delta[ENVELOPE_STATE_KEY]) envelope = delta[ENVELOPE_STATE_KEY];
+            const parts = ev.content && ev.content.parts;
+            if (Array.isArray(parts)) {
+              for (const p of parts) {
+                if (typeof p.text === "string" && p.text) {
+                  acc += p.text;
+                  first = false;
+                  body.textContent = acc;
+                  thread.scrollTop = thread.scrollHeight;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (first) {
+        body.textContent = "";
+        renderTutor("Не удалось получить ответ. Попробуйте ещё раз.");
+      } else {
+        // Финальная отрисовка. Конверт берём из отдельного канала, а если его
+        // нет (например, старый сервер) — извлекаем из текста, как раньше.
+        body.textContent = "";
+        const env = envelope || parseEnvelope(acc);
+        const cleanText = env && typeof env.text === "string" ? env.text : acc;
+        body.textContent = cleanText;
+        if (env && env.type === "quiz" && env.payload) renderQuiz(body, env.payload);
+        speak(cleanText);
+      }
+      setStatus("ready", "урок готов");
+    } catch (err) {
+      body.textContent = "";
+      renderTutor("Упс: " + (err && err.message ? err.message : "неизвестная ошибка") +
+        "\n\nПроверьте, что ADK-сервер запущен, и адрес в «Настройках».");
+      setStatus("error", "нет связи");
+    } finally {
+      busy = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  // ── Загрузка файла как артефакта сессии ───────────────────
+  async function uploadFile(file) {
+    if (!file) return;
+    try {
+      const sid = await ensureSession();
+      setStatus("busy", "загружаю файл…");
+      const buf = new Uint8Array(await file.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      const b64 = btoa(bin);
+
+      const res = await fetch(
+        url(`/apps/${encodeURIComponent(cfg.app)}/users/${encodeURIComponent(cfg.user)}/sessions/${encodeURIComponent(sid)}/artifacts`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            artifact: { inlineData: { mimeType: file.type || "text/plain", data: b64 } },
+          }),
+        }
+      );
+      if (!res.ok) throw new Error(`не удалось загрузить файл (${res.status})`);
+      setStatus("ready", "файл загружен");
+      await sendMessage(`Я приложил файл «${file.name}». Прочитай его (read_artifact) и помоги с заданием.`);
+    } catch (err) {
+      setStatus("error", "ошибка загрузки");
+      renderTutor("Не удалось загрузить файл: " + (err && err.message ? err.message : "ошибка") +
+        "\n\nПоддерживаются текстовые форматы (txt, md, csv, json, yaml).");
+    }
+  }
+
+  // ── Голос: распознавание (push-to-talk) ───────────────────
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recog = null;
+  let recogActive = false;
+  let baseText = "";
+
+  function setupRecognition() {
+    if (!SR) {
+      voiceState.textContent = "Голосовой ввод: не поддерживается браузером (печатайте текстом)";
+      micBtn.disabled = true;
+      micBtn.title = "Браузер не поддерживает распознавание речи";
+      return;
+    }
+    recog = new SR();
+    recog.lang = cfg.lang;
+    recog.interimResults = true;
+    recog.continuous = false;
+
+    recog.addEventListener("start", () => {
+      recogActive = true;
+      baseText = input.value ? input.value + " " : "";
+      micBtn.setAttribute("aria-pressed", "true");
+      voiceState.textContent = "Голосовой ввод: слушаю…";
+    });
+    recog.addEventListener("result", (e) => {
+      let txt = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      input.value = baseText + txt;
+      autosize();
+    });
+    recog.addEventListener("error", (e) => {
+      voiceState.textContent = "Голосовой ввод: " + (e.error === "not-allowed" ? "нет доступа к микрофону" : e.error);
+    });
+    const stop = () => {
+      recogActive = false;
+      micBtn.setAttribute("aria-pressed", "false");
+      voiceState.textContent = "Голосовой ввод: выкл";
+    };
+    recog.addEventListener("end", stop);
+    recog.addEventListener("error", stop);
+  }
+
+  function startRecog() {
+    if (!recog || recogActive) return;
+    try { recog.start(); } catch { /* уже запущен */ }
+  }
+  function stopRecog() {
+    if (!recog || !recogActive) return;
+    try { recog.stop(); } catch { /* ignore */ }
+  }
+
+  // Push-to-talk: удержание мышью
+  micBtn.addEventListener("mousedown", (e) => { e.preventDefault(); startRecog(); });
+  micBtn.addEventListener("mouseup", stopRecog);
+  micBtn.addEventListener("mouseleave", stopRecog);
+  // Удержание пальцем
+  micBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startRecog(); }, { passive: false });
+  micBtn.addEventListener("touchend", (e) => { e.preventDefault(); stopRecog(); });
+  // Удержание пробелом (когда фокус на кнопке)
+  micBtn.addEventListener("keydown", (e) => {
+    if (e.code === "Space") { e.preventDefault(); startRecog(); }
+  });
+  micBtn.addEventListener("keyup", (e) => {
+    if (e.code === "Space") { e.preventDefault(); stopRecog(); }
+  });
+
+  // ── Голос: озвучка (TTS) ──────────────────────────────────
+  function speak(text) {
+    if (!ttsOn || !("speechSynthesis" in window) || !text) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = cfg.lang;
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    } catch { /* ignore */ }
+  }
+
+  function setTts(on) {
+    ttsOn = on;
+    ttsToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    localStorage.setItem("tutor.tts", on ? "1" : "0");
+    if (!on && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+  ttsToggle.addEventListener("click", () => setTts(!ttsOn));
+
+  // ── Композер ──────────────────────────────────────────────
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 168) + "px";
+  }
+  input.addEventListener("input", autosize);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input.value); }
+  });
+  form.addEventListener("submit", (e) => { e.preventDefault(); sendMessage(input.value); });
+
+  $("attach").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    uploadFile(f);
+  });
+
+  $("new-session").addEventListener("click", async () => {
+    sessionId = null;
+    localStorage.removeItem("tutor.sessionId");
+    thread.querySelectorAll(".turn").forEach((n) => n.remove());
+    try { await ensureSession(true); } catch { setStatus("error", "нет связи"); }
+    input.focus();
+  });
+
+  // ── Настройки (диалог) ────────────────────────────────────
+  const dlg = $("settings");
+  $("open-settings").addEventListener("click", () => {
+    $("cfg-base").value = cfg.base || "";
+    $("cfg-app").value = cfg.app;
+    $("cfg-user").value = cfg.user;
+    $("cfg-lang").value = cfg.lang;
+    dlg.showModal();
+  });
+  $("close-settings").addEventListener("click", () => dlg.close());
+  $("save-settings").addEventListener("click", () => {
+    cfg.base = $("cfg-base").value.trim();
+    cfg.app = $("cfg-app").value.trim() || DEFAULTS.app;
+    cfg.user = $("cfg-user").value.trim() || DEFAULTS.user;
+    cfg.lang = $("cfg-lang").value.trim() || DEFAULTS.lang;
+    localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+    dlg.close();
+    sessionId = null;
+    localStorage.removeItem("tutor.sessionId");
+    resetThread();
+    ensureSession(true).catch(() => setStatus("error", "нет связи"));
+    if (recog) recog.lang = cfg.lang;
+  });
+  $("reset-settings").addEventListener("click", () => {
+    $("cfg-base").value = DEFAULTS.base;
+    $("cfg-app").value = DEFAULTS.app;
+    $("cfg-user").value = cfg.user;
+    $("cfg-lang").value = DEFAULTS.lang;
+  });
+
+  function resetThread() {
+    thread.innerHTML = "";
+    const h = document.createElement("div");
+    h.className = "hint";
+    h.innerHTML = '<strong>Новый урок начат.</strong> Спрашивайте — разберём тему по шагам.';
+    thread.appendChild(h);
+  }
+
+  // ── Инициализация ─────────────────────────────────────────
+  setTts(ttsOn);
+  setupRecognition();
+  autosize();
+  ensureSession()
+    .then(() => setStatus("ready", "урок готов"))
+    .catch(() => setStatus("error", "сервер недоступен — откройте «Настройки»"));
+})();
+</script>
+</body>
+</html>

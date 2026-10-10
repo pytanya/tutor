@@ -1,0 +1,31 @@
+# Секреты
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Тесты и кэш
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ADK
+.adk/
+sessions.db
+
+# Редакторы / ОС
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Локальные артефакты
+.tmp_*

@@ -1,0 +1,18 @@
+# --- Ядро: Google ADK + провайдер не-Gemini моделей ---
+google-adk>=2.11.0
+litellm>=1.104.0
+
+# --- Веб-слой (FastAPI уже тянется с google-adk, фиксируем явно) ---
+fastapi>=0.133
+uvicorn>=0.34
+python-multipart>=0.0.9   # загрузка файлов (multipart/form-data)
+
+# --- Конфигурация, HTTP, валидация ---
+python-dotenv>=1.0
+pydantic>=2.12
+pydantic-settings>=2.13
+httpx>=0.28
+
+# --- Тесты ---
+pytest>=8.0
+pytest-asyncio>=1.0
